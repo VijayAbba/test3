@@ -189,8 +189,7 @@ app.get("/tweets/:tweetId/", authenticateToken, async (request, response) => {
         FROM
             (( follower INNER JOIN tweet ON follower.following_user_id = tweet.user_id ) AS T 
             INNER JOIN like ON tweet.tweet_id = like.tweet_id ) AS H 
-            INNER JOIN reply ON tweet.tweet_id = reply.tweet_id
-            
+            INNER JOIN reply ON tweet.tweet_id = reply.tweet_id   
         WHERE
             tweet.tweet_id = ${tweetId}
         GROUP BY
