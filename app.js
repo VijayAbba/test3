@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const path = require("path");
-const { format } = require("date-fns");
+// const { format } = require("date-fns");
 
 const app = express();
 app.use(express.json());
@@ -99,12 +99,12 @@ const authenticateToken = (request, response, next) => {
   }
 
   if (jwtToken === undefined) {
-    response.status(400);
+    response.status(401);
     response.send("Invalid JWT Token");
   } else {
     jwt.verify(jwtToken, "my_secret_key", async (error, payload) => {
       if (error) {
-        response.status(400);
+        response.status(401);
         response.send("Invalid JWT Token");
       } else {
         request.username = payload.username;
@@ -182,15 +182,16 @@ app.get("/tweets/:tweetId/", authenticateToken, async (request, response) => {
 
   const getUserTweet = `
         SELECT
-            tweet.tweet,
+            tweet.tweet AS tweet,
             COUNT(DISTINCT like.like_id) AS likes,
             COUNT(DISTINCT reply.reply_id) AS replies,
             tweet.date_time AS dateTime
         FROM
-            (tweet INNER JOIN like ON tweet.tweet_id = like.tweet_id ) AS T 
+            (( follower INNER JOIN tweet ON follower.following_user_id = tweet.user_id ) AS T 
+            INNER JOIN like ON tweet.tweet_id = like.tweet_id ) AS H 
             INNER JOIN reply ON tweet.tweet_id = reply.tweet_id
+            
         WHERE
-            tweet.user_id = ${login_user_id} AND
             tweet.tweet_id = ${tweetId}
         GROUP BY
             tweet.tweet;`;
@@ -213,7 +214,7 @@ app.get(
 
     const selectLikedNames = `
         SELECT 
-            user.name AS name
+            user.username AS name
         FROM 
             (( follower INNER JOIN tweet ON follower.following_user_id = tweet.user_id ) AS T 
             INNER JOIN like ON tweet.tweet_id = like.tweet_id ) AS H 
@@ -231,7 +232,7 @@ app.get(
         return obj["name"];
       });
 
-      response.send(listObject);
+      response.send({ likes: listObject });
     }
   }
 );
@@ -264,7 +265,6 @@ app.get(
       let responseObject = {
         replies: dbResponse,
       };
-      T;
       //   const listObject = dbResponse.map((obj) => {
       // return obj["name"];
       //   });
@@ -302,13 +302,11 @@ app.post("/user/tweets/", authenticateToken, async (request, response) => {
   const { login_user_id } = request;
   const { tweet } = request.body;
 
-  const now = format(new Date(), "yyy-MM-dd HH:mm:ss");
-  console.log(now);
   const createUserTweet = `
         INSERT INTO 
-            tweet(tweet_id,tweet, user_id, date_time)
+            tweet(tweet, user_id)
         VALUES
-            (${15},'${tweet}', ${login_user_id}, '${now}');`;
+            ('${tweet}', ${login_user_id});`;
   const dbResponse = await database.run(createUserTweet);
   console.log(dbResponse.lastID);
   response.send("Created a Tweet");
